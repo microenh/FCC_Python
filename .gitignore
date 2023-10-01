@@ -1,0 +1,9 @@
+_deps
+/build/**
+/dist/**
+/__pycache__/**
+.DS_Store
+l_amat.zip
+amateur_delim.zip
+fcc.sqlite
+canada.sqlite
