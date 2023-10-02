@@ -1,17 +1,22 @@
-from io import BytesIO
+"managed data from Canada"
 import os
-import requests
 import sqlite3
 import time
 import zipfile
+from io import BytesIO
 
-class Canada_Data:
+import requests
+
+
+class CanadaData:
+    "class to get data for Canada"
     URL = 'https://apc-cap.ic.gc.ca/datafiles/amateur_delim.zip'
 
-    STATUS_TITLE = 'Canada'    
+    STATUS_TITLE = 'Canada'
 
     DB = os.path.join(os.path.dirname(__file__), "canada.sqlite")
-    LOCAL_DOWNLOAD = os.path.join(os.path.dirname(__file__), "amateur_delim.zip")
+    LOCAL_DOWNLOAD = os.path.join(
+        os.path.dirname(__file__), "amateur_delim.zip")
 
     CREATE_LOOKUP = """
     create table lookup
@@ -41,59 +46,62 @@ class Canada_Data:
 
     VACUUM = f"vacuum into '{DB}';"
 
-    def __init__(self, mainApp):
-        self.mainApp = mainApp
+    def __init__(self, main_app):
+        self.main_app = main_app
         self.elapsed_time = 0
 
     def update(self):
         """Populate canada.sqlite database with data downloaded from IC."""
 
         def insert_data():
-            self.mainApp.update_status_display(f'Unpacking data')
-            data = [i.split(';') for i in str(zf.read('amateur_delim.txt'), encoding='UTF-8').replace('"', '').split('\r\n')[1:]]
-            self.mainApp.update_status_display(f'Importing data')
+            self.main_app.update_status_display('Unpacking data')
+            data = [i.split(';') for i in str(zf.read(
+                'amateur_delim.txt'), encoding='UTF-8').replace('"', '').split('\r\n')[1:]]
+            self.main_app.update_status_display('Importing data')
             field_count = len(data[0])
             stmt = f"insert into lookup values ({','.join(['?'] * field_count)});"
-            self.mainApp.update_progressbar(max=len(data))
+            self.main_app.update_progressbar(max=len(data))
             j = 0
             for i in data:
                 if len(i) == field_count:
                     con.execute(stmt, i)
                 j += 1
                 if j % 8000 == 0:
-                    self.mainApp.update_progressbar(j)
-            self.mainApp.progress.set(0)
-            self.mainApp.update_status_display('')
+                    self.main_app.update_progressbar(j)
+            self.main_app.progress.set(0)
+            self.main_app.update_status_display('')
             con.commit()
 
         def download():
-            self.mainApp.update_status_display('Downloading')
+            self.main_app.update_status_display('Downloading')
             chunk_size = 1024 * 1024
             response = requests.get(self.URL, stream=True)
-            total_size_in_bytes= int(response.headers.get('content-length', 0))
-            self.mainApp.update_progressbar(max=total_size_in_bytes)
+            total_size_in_bytes = int(
+                response.headers.get('content-length', 0))
+            self.main_app.update_progressbar(max=total_size_in_bytes)
             received = bytearray()
             total = 0
             for data in response.iter_content(chunk_size=chunk_size):
                 received += data
                 total += chunk_size
-                self.mainApp.update_progressbar(total)
-            self.mainApp.progress.set(0)
-            self.mainApp.update_status_display('')
+                self.main_app.update_progressbar(total)
+            self.main_app.progress.set(0)
+            self.main_app.update_status_display('')
             return received
 
         def read_local():
+            "use locally cached file - for testing"
             with open(self.LOCAL_DOWNLOAD, 'rb') as f:
                 data = f.read()
             return data
-                      
+
         start = time.time()
-        
+
         zf = zipfile.ZipFile(BytesIO(download()))
         # zf = zipfile.ZipFile(BytesIO(read_local()))
 
-        self.mainApp.update_status_display('Create database schema')
-        
+        self.main_app.update_status_display('Create database schema')
+
         with sqlite3.connect(":memory:") as con:
             # create table / index
             con.execute(self.CREATE_LOOKUP)
@@ -107,12 +115,13 @@ class Canada_Data:
                 os.remove(self.DB)
             except FileNotFoundError:
                 pass
-            
-            con.execute(self.VACUUM) # saves :memory: database to file
+
+            con.execute(self.VACUUM)  # saves :memory: database to file
 
         self.elapsed_time = time.time() - start
 
     def get_db_data(self, query):
+        "get data from sqlite database"
         with sqlite3.connect(self.DB) as con:
             cursor = con.cursor()
             try:
@@ -124,7 +133,9 @@ class Canada_Data:
         return result
 
     def lookup(self, call):
-        lookup = self.get_db_data(f"select * from lookup where callsign='{call}'")
+        "lookup callsign record"
+        lookup = self.get_db_data(
+            f"select * from lookup where callsign='{call}'")
         if lookup is None:
             return None
         else:

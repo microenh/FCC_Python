@@ -1,17 +1,23 @@
-from io import BytesIO
+"""manage US data imported from FCC"""
+
 import os
-import requests
 import sqlite3
 import time
 import zipfile
+from io import BytesIO
 
-class FCC_Data:
+import requests
+
+
+class FCCData:
+    """main class"""
     URL = 'https://data.fcc.gov/download/pub/uls/complete/l_amat.zip'
 
     STATUS_TITLE = 'US'
 
     DB = os.path.join(os.path.dirname(__file__), "fcc.sqlite")
-    LOCAL_DOWNLOAD = os.path.join(os.path.dirname(__file__), "SampleData", "l_amat.zip")
+    LOCAL_DOWNLOAD = os.path.join(os.path.dirname(
+        __file__), "SampleData", "l_amat.zip")
 
     # if SMALL_DB, just create lookup table, populated via query from AM,EN and HD
     # if not, create all tables plus view lookup
@@ -328,61 +334,66 @@ class FCC_Data:
                 'T': 'Technician'}
 
     months = {'JAN': 1, 'FEB': 2, 'MAR': 3, 'APR': 4, 'MAY': 5, 'JUN': 6,
-            'JUL': 7, 'AUG': 8, 'SEP': 9, 'OCT': 10, 'NOV': 11, 'DEC': 12}
+              'JUL': 7, 'AUG': 8, 'SEP': 9, 'OCT': 10, 'NOV': 11, 'DEC': 12}
 
-    def __init__(self, mainApp):
-        self.mainApp = mainApp
+    def __init__(self, main_app):
+        self.main_app = main_app
         self.elapsed_time = 0
 
     def update(self):
         """Populate fcc.sqlite database with data downloaded from FCC."""
 
         def insert_data(table_name):
-            self.mainApp.update_status_display(f'Unpacking {table_name}.dat')
-            data = [i.split('|') for i in str(zf.read(table_name + '.dat'), encoding='UTF-8').replace('"', '').split('\r\n')[:-1]]
-            self.mainApp.update_status_display(f'Importing {table_name}')
+            "insert data into sqlite database"
+            self.main_app.update_status_display(f'Unpacking {table_name}.dat')
+            data = [i.split('|') for i in str(zf.read(
+                table_name + '.dat'), encoding='UTF-8').replace('"', '').split('\r\n')[:-1]]
+            self.main_app.update_status_display(f'Importing {table_name}')
             field_count = len(data[0])
             stmt = f"insert into {table_name} values ({','.join(['?'] * field_count)});"
-            self.mainApp.update_progressbar(max=len(data))
+            self.main_app.update_progressbar(max=len(data))
             j = 0
             for i in data:
                 if len(i) == field_count:
                     con.execute(stmt, i)
                 j += 1
                 if j % 8000 == 0:
-                    self.mainApp.update_progressbar(j)
-            self.mainApp.progress.set(0)
-            self.mainApp.update_status_display('')
+                    self.main_app.update_progressbar(j)
+            self.main_app.progress.set(0)
+            self.main_app.update_status_display('')
             con.commit()
 
         def download():
-            self.mainApp.update_status_display('Downloading')
+            "download data from government's website"
+            self.main_app.update_status_display('Downloading')
             chunk_size = 1024 * 1024
             response = requests.get(self.URL, stream=True)
-            total_size_in_bytes= int(response.headers.get('content-length', 0))
-            self.mainApp.update_progressbar(max=total_size_in_bytes)
+            total_size_in_bytes = int(
+                response.headers.get('content-length', 0))
+            self.main_app.update_progressbar(max=total_size_in_bytes)
             received = bytearray()
             total = 0
             for data in response.iter_content(chunk_size=chunk_size):
                 received += data
                 total += chunk_size
-                self.mainApp.update_progressbar(total)
-            self.mainApp.progress.set(0)
-            self.mainApp.update_status_display('')
+                self.main_app.update_progressbar(total)
+            self.main_app.progress.set(0)
+            self.main_app.update_status_display('')
             return received
-        
+
         def read_local():
+            "use locally cached file"
             with open(self.LOCAL_DOWNLOAD, 'rb') as f:
                 data = f.read()
             return data
-                      
+
         start = time.time()
-        
+
         # zf = zipfile.ZipFile(BytesIO(download()))
         zf = zipfile.ZipFile(BytesIO(read_local()))
-    
-        self.mainApp.update_status_display('Create database schema')
-        
+
+        self.main_app.update_status_display('Create database schema')
+
         with sqlite3.connect(":memory:") as con:
             # create tables
             for i in (self.CREATE_AM, self.CREATE_EN, self.CREATE_HD, self.CREATE_DB_DATE, self.CREATE_LOOKUP):
@@ -400,36 +411,38 @@ class FCC_Data:
                 for i in ('CO', 'HS', 'LA', 'SC', 'SF'):
                     insert_data(i)
 
-            self.mainApp.update_status_display('Unpacking counts')
-            date = [i.split('|') for i in str(zf.read('counts'), encoding='UTF-8').replace('"', '').split('\r\n')[:-1]][0][0].split(' ')
+            self.main_app.update_status_display('Unpacking counts')
+            date = [i.split('|') for i in str(zf.read(
+                'counts'), encoding='UTF-8').replace('"', '').split('\r\n')[:-1]][0][0].split(' ')
             # print (date)
             # ['File', 'Creation', 'Date:', 'Sun', 'Oct', '', '1', '16:54:34', 'EDT', '2023']
-            self.mainApp.update_status_display('Importing DB_DATE')
-            con.execute(self.INSERT_DB_DATE, (f'{self.months[date[4].upper()]}/{date[6]}/{date[9]}',))
+            self.main_app.update_status_display('Importing DB_DATE')
+            con.execute(self.INSERT_DB_DATE,
+                        (f'{self.months[date[4].upper()]}/{date[6]}/{date[9]}',))
             con.commit()
 
-            self.mainApp.update_status_display('Building database')
-    
+            self.main_app.update_status_display('Building database')
+
             # update permanent tables
             if self.SMALL_DB:
                 for i in (self.INSERT_LOOKUP, self.INDEX_LOOKUP):
                     con.execute(i)
                     con.commit()
 
-            self.mainApp.update_status_display('Saving databse')
+            self.main_app.update_status_display('Saving databse')
 
             # delete any existing database file
             try:
                 os.remove(self.DB)
             except FileNotFoundError:
                 pass
-            
-            con.execute(self.VACUUM) # saves :memory: database to file
+
+            con.execute(self.VACUUM)  # saves :memory: database to file
 
         self.elapsed_time = time.time() - start
 
-
     def get_db_data(self, query):
+        "get data from sqlite database"
         with sqlite3.connect(self.DB) as con:
             cursor = con.cursor()
             try:
@@ -441,18 +454,23 @@ class FCC_Data:
         return result
 
     def get_db_date(self):
+        "get the date the data was created by the government"
         result = self.get_db_data("select date from db_date;")
         if result is not None:
             result = result[0]
         return result
-        
+
     def lookup(self, call):
-        lookup = self.get_db_data(f"select * from lookup where callsign='{call}'")
+        "lookup callsign data"
+        lookup = self.get_db_data(
+            f"select * from lookup where callsign='{call}'")
         if lookup is None:
             return None
         else:
             name = ' '.join([i for i in lookup[11:15] if i > ''])
-            op = 'Class: ' + self.op_class.get(lookup[5], 'Unknown') if lookup[9] == 'I' else ''
+            op = 'Class: ' + \
+                self.op_class.get(
+                    lookup[5], 'Unknown') if lookup[9] == 'I' else ''
             vanity = 'Vanity' if lookup[1] == 'HV' else ''
             expires = 'Expires: ' + lookup[3] if lookup[3] > '' else ''
             if name == '':

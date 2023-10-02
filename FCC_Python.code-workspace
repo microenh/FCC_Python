@@ -1,0 +1,18 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+    "settings": {
+        "python.analysis.typeCheckingMode": "basic",
+        "editor.formatOnSaveMode": "file",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": true
+        },
+        "[python]": {
+            "editor.defaultFormatter": "ms-python.autopep8"
+        },
+    }
+}
