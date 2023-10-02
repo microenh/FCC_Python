@@ -11,7 +11,7 @@ class FCC_Data:
     STATUS_TITLE = 'US'
 
     DB = os.path.join(os.path.dirname(__file__), "fcc.sqlite")
-    LOCAL_DOWNLOAD = os.path.join(os.path.dirname(__file__), "l_amat.zip")
+    LOCAL_DOWNLOAD = os.path.join(os.path.dirname(__file__), "SampleData", "l_amat.zip")
 
     # if SMALL_DB, just create lookup table, populated via query from AM,EN and HD
     # if not, create all tables plus view lookup
@@ -328,7 +328,7 @@ class FCC_Data:
                 'T': 'Technician'}
 
     months = {'JAN': 1, 'FEB': 2, 'MAR': 3, 'APR': 4, 'MAY': 5, 'JUN': 6,
-            'JUL': 6, 'AUG': 7, 'SEP': 8, 'OCT': 9, 'NOV': 10, 'DEC': 12}
+            'JUL': 7, 'AUG': 8, 'SEP': 9, 'OCT': 10, 'NOV': 11, 'DEC': 12}
 
     def __init__(self, mainApp):
         self.mainApp = mainApp
@@ -378,8 +378,8 @@ class FCC_Data:
                       
         start = time.time()
         
-        zf = zipfile.ZipFile(BytesIO(download()))
-        # zf = zipfile.ZipFile(BytesIO(read_local()))
+        # zf = zipfile.ZipFile(BytesIO(download()))
+        zf = zipfile.ZipFile(BytesIO(read_local()))
     
         self.mainApp.update_status_display('Create database schema')
         
@@ -402,8 +402,10 @@ class FCC_Data:
 
             self.mainApp.update_status_display('Unpacking counts')
             date = [i.split('|') for i in str(zf.read('counts'), encoding='UTF-8').replace('"', '').split('\r\n')[:-1]][0][0].split(' ')
+            # print (date)
+            # ['File', 'Creation', 'Date:', 'Sun', 'Oct', '', '1', '16:54:34', 'EDT', '2023']
             self.mainApp.update_status_display('Importing DB_DATE')
-            con.execute(self.INSERT_DB_DATE, (f'{self.months[date[4].upper()]}/{date[5]}/{date[8]}',))
+            con.execute(self.INSERT_DB_DATE, (f'{self.months[date[4].upper()]}/{date[6]}/{date[9]}',))
             con.commit()
 
             self.mainApp.update_status_display('Building database')

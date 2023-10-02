@@ -1,6 +1,7 @@
 _deps
 /build/**
 /dist/**
+/SampleData/**
 /__pycache__/**
 .DS_Store
 l_amat.zip
