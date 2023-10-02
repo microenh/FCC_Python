@@ -110,7 +110,7 @@ class App(tk.Tk):
     def lookup(self, _):
         "get data from database"
         self.update_status2.set('')      # clear elapsed time display
-        call = self.call.get_entry().upper()
+        call = self.call_entry.get().upper()
         self.call_entry.set('')
         self.display_call.set(call)
 
