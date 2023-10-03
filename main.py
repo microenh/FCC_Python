@@ -25,42 +25,8 @@ class App(tk.Tk):
         self.after_idle(lambda: self.eval("tk::PlaceWindow . center center"))
         self.image = ImageTk.PhotoImage(Image.open(self.LOGO))
 
-        self.call_entry = tk.StringVar()
-        self.display_call = tk.StringVar()
-        self.lookup_result = tk.StringVar()
-        self.db_date = tk.StringVar()
-        self.update_status = tk.StringVar()
-        self.update_status2 = tk.StringVar()
-        self.progress = tk.IntVar()
-
-        menu_font = font.Font(family='TkMenuFont', size=14)
-        heading_font = font.Font(family='TkHeadingFont', size=20)
-        small_font = font.Font(family='TkMenuFont', size=8)
-
-        style = ttk.Style()
-        style.theme_use('default')
-        # print (self.tk.call('tk', 'windowingsystem')) # aqua on macos, x11 on Raspberry pi
-        self.windowingsystem = self.tk.call('tk', 'windowingsystem')
-        style.configure('item.TLabel', foreground='white',
-                        background=BG_COLOR, font=menu_font)
-        style.configure('ingredient.TLabel', foreground='white',
-                        background=DARK_BG_COLOR, font=menu_font)
-        style.configure('heading.TLabel', foreground='yellow',
-                        background=BG_COLOR, font=heading_font)
-        style.configure('small.TButton', foreground='white',
-                        background=DARK_BG_COLOR, font=menu_font)
-        style.configure('large.TButton', foreground='white',
-                        background=DARK_BG_COLOR, font=heading_font)
-        style.configure('small.TLabel', foreground='white',
-                        background=BG_COLOR, font=small_font)
-        style.configure('new.TEntry', foreground='black',
-                        background='white', insertcolor='black', insertwidth='1')
-
-        style.configure('red.Horizontal.TProgressbar',
-                        troughcolor=BG_COLOR,
-                        lightcolor=BG_COLOR,
-                        darkcolor=DARK_BG_COLOR,
-                        background=DARK_BG_COLOR)
+        self.create_tk_vars()
+        self.create_styles()
 
         frame = tk.Frame(self, width=400, height=500, bg=BG_COLOR)
         frame.grid(row=0, column=0, sticky='nsew')
@@ -68,10 +34,10 @@ class App(tk.Tk):
 
         frame2 = tk.Frame(frame, bg=BG_COLOR)
         frame2.pack(fill='x', padx=10, pady=10)
-        ttk.Button(frame2, style='small.TButton', width=2, text=flag.flag('US'),
-                   command=self.update_us_db).pack(side='left', padx=(0, 4))
-        ttk.Button(frame2, style='small.TButton', width=2, text=flag.flag('CA'),
-                   command=self.update_canada_db).pack(side='left')
+        ttk.Button(frame2, style='small.TButton', width=2, text=flag.flag(
+            'US'), command=self.update_us_db).pack(side='left', padx=(0, 4))
+        ttk.Button(frame2, style='small.TButton', width=2, text=flag.flag(
+            'CA'), command=self.update_canada_db).pack(side='left')
         ttk.Label(frame2, style='small.TLabel', textvariable=self.update_status2).pack(
             side='left', padx=(10, 0))
 
@@ -93,10 +59,7 @@ class App(tk.Tk):
         ttk.Label(frame, style='item.TLabel',
                   textvariable=self.lookup_result).pack(pady=(10, 0))
 
-        self.status_dialog = tk.Toplevel()
-        self.status_dialog.withdraw()
-        self.status_dialog.geometry('300x100')
-        self.status_dialog.title('Updating')
+        self.create_status_dialog()
 
         frame = tk.Frame(self.status_dialog, bg=BG_COLOR)
         frame.pack(expand=True, fill='both')
@@ -106,6 +69,51 @@ class App(tk.Tk):
         self.progressbar = ttk.Progressbar(
             frame, style='red.Horizontal.TProgressbar', variable=self.progress, orient='horizontal')
         self.progressbar.pack(side='top', fill='x', padx=10, pady=10)
+
+    def create_styles(self):
+        "create ttk styles"
+        menu_font = font.Font(family='TkMenuFont', size=14)
+        heading_font = font.Font(family='TkHeadingFont', size=20)
+        small_font = font.Font(family='TkMenuFont', size=8)
+
+        style = ttk.Style()
+        style.theme_use('default')
+        self.windowingsystem = self.tk.call('tk', 'windowingsystem')
+        # win32 on windows, aqua on macos, x11 on Raspberry pi
+        style.configure('item.TLabel', foreground='white',
+                        background=BG_COLOR, font=menu_font)
+        style.configure('ingredient.TLabel', foreground='white',
+                        background=DARK_BG_COLOR, font=menu_font)
+        style.configure('heading.TLabel', foreground='yellow',
+                        background=BG_COLOR, font=heading_font)
+        style.configure('small.TButton', foreground='white',
+                        background=DARK_BG_COLOR, font=menu_font)
+        style.configure('large.TButton', foreground='white',
+                        background=DARK_BG_COLOR, font=heading_font)
+        style.configure('small.TLabel', foreground='white',
+                        background=BG_COLOR, font=small_font)
+        style.configure('new.TEntry', foreground='black',
+                        background='white', insertcolor='black', insertwidth='1')
+
+        style.configure('red.Horizontal.TProgressbar',  troughcolor=BG_COLOR,
+                        lightcolor=BG_COLOR, darkcolor=DARK_BG_COLOR, background=DARK_BG_COLOR)
+
+    def create_status_dialog(self):
+        "create status dialog"
+        self.status_dialog = tk.Toplevel()
+        self.status_dialog.withdraw()
+        self.status_dialog.geometry('300x100')
+        self.status_dialog.title('Updating')
+
+    def create_tk_vars(self):
+        "initialize tk.vars"
+        self.call_entry = tk.StringVar()
+        self.display_call = tk.StringVar()
+        self.lookup_result = tk.StringVar()
+        self.db_date = tk.StringVar()
+        self.update_status = tk.StringVar()
+        self.update_status2 = tk.StringVar()
+        self.progress = tk.IntVar()
 
     def lookup(self, _):
         "get data from database"
