@@ -1,155 +1,129 @@
-"managed data from Canada"
-import os
+"manage data from Canada"
+
+import datetime
 import sqlite3
-import time
 import zipfile
 from io import BytesIO
 
-import requests
+import flag
+
+from db_base import CREATE_DB_DATE, DBBase
+
+CREATE_LOOKUP = """
+create table lookup
+(
+    callsign char(10) not null,
+    given_names char(60) not null,
+    surname char(40) not null,
+    street_address char(80) not null,
+    city char(50) not null,
+    province char(2) not null,
+    post_code char(7) not null,
+    basic char(1) not null,
+    wpm_5 char(1) not null,
+    wpm_12 char(1) not null,
+    advanced char(1) not null,
+    honours char(1) not null,
+    club_name1 char(80) not null,
+    club_name2 char(80) not null,
+    club_address char(80) not null,
+    club_city char(50) not null,
+    club_province char(2) not null,
+    club_post_code char(7) not null
+);
+"""
+
+INDEX_LOOKUP = 'create index callsign on lookup(callsign);'
+
+URL = 'https://apc-cap.ic.gc.ca/datafiles/amateur_delim.zip'
+COUNTRY = 'Canada'
+FLAG = flag.flag('CA')
 
 
-class CanadaData:
-    "class to get data for Canada"
-    URL = 'https://apc-cap.ic.gc.ca/datafiles/amateur_delim.zip'
-
-    STATUS_TITLE = 'Canada'
-
-    DB = os.path.join(os.path.dirname(__file__), "canada.sqlite")
-    LOCAL_DOWNLOAD = os.path.join(
-        os.path.dirname(__file__), "amateur_delim.zip")
-
-    CREATE_LOOKUP = """
-    create table lookup
-    (
-        callsign char(10) not null,
-        given_names char(60) not null,
-        surname char(40) not null,
-        street_address char(80) not null,
-        city char(50) not null,
-        province char(2) not null,
-        post_code char(7) not null,
-        basic char(1) not null,
-        wpm_5 char(1) not null,
-        wpm_12 char(1) not null,
-        advanced char(1) not null,
-        honours char(1) not null,
-        club_name1 char(80) not null,
-        club_name2 char(80) not null,
-        club_address char(80) not null,
-        club_city char(50) not null,
-        club_province char(2) not null,
-        club_post_code char(7) not null
-    );
-    """
-
-    INDEX_LOOKUP = 'create index callsign on lookup(callsign);'
-
-    VACUUM = f"vacuum into '{DB}';"
+class CanadaData(DBBase):
+    """process data from Canada"""
 
     def __init__(self, main_app):
+        super().__init__(main_app)
+        self.create = (CREATE_LOOKUP, INDEX_LOOKUP, CREATE_DB_DATE)
+        self.table_names = ('amateur_delim',)
+        self.permanent_names = ()
+        self.status_title = COUNTRY
+        self.flag_text = FLAG
+
+        self.local_download = ''
+        # self.local_download = self.working_folder("amateur_delim.zip")
+
         self.main_app = main_app
         self.elapsed_time = 0
 
+    def parse(self, table_name, suffix, data):
+        "extract records from file in zip archive"
+        return [i.split(';') for i in str(data.read(
+            table_name + suffix), encoding='UTF-8').replace('"', '').split('\r\n')[1:]]
+
     def update(self):
-        """Populate canada.sqlite database with data downloaded from IC."""
+        """Populate canada.sqlite with data downloaded from Canada"""
+        self.begin()
 
-        def insert_data():
-            self.main_app.update_status_display('Unpacking data')
-            data = [i.split(';') for i in str(zf.read(
-                'amateur_delim.txt'), encoding='UTF-8').replace('"', '').split('\r\n')[1:]]
-            self.main_app.update_status_display('Importing data')
-            field_count = len(data[0])
-            stmt = f"insert into lookup values ({','.join(['?'] * field_count)});"
-            self.main_app.update_progressbar(max=len(data))
-            j = 0
-            for i in data:
-                if len(i) == field_count:
-                    con.execute(stmt, i)
-                j += 1
-                if j % 8000 == 0:
-                    self.main_app.update_progressbar(j)
-            self.main_app.progress.set(0)
-            self.main_app.update_status_display('')
-            con.commit()
+        bytes_read = (self.read_local(self.local_download)
+                      if self.local_download > ''
+                      else self.download(URL))
+        if len(bytes_read) == 0:
+            self.main_app.update_status2.set('Error reading data')
+            return
 
-        def download():
-            self.main_app.update_status_display('Downloading')
-            chunk_size = 1024 * 1024
-            response = requests.get(self.URL, stream=True)
-            total_size_in_bytes = int(
-                response.headers.get('content-length', 0))
-            self.main_app.update_progressbar(max=total_size_in_bytes)
-            received = bytearray()
-            total = 0
-            for data in response.iter_content(chunk_size=chunk_size):
-                received += data
-                total += chunk_size
-                self.main_app.update_progressbar(total)
-            self.main_app.progress.set(0)
-            self.main_app.update_status_display('')
-            return received
+        with zipfile.ZipFile(BytesIO(bytes_read)) as zfl:
+            with sqlite3.connect(":memory:") as con:
 
-        def read_local():
-            "use locally cached file - for testing"
-            with open(self.LOCAL_DOWNLOAD, 'rb') as f:
-                data = f.read()
-            return data
+                # create tables
+                self.create_tables(con, self.create)
+                if self.main_app.aborted:
+                    return
 
-        start = time.time()
+                # insert data from FCC data
+                for table_name in self.table_names:
+                    if self.main_app.aborted:
+                        return
+                    self.main_app.update_status.set(
+                        f'Unpacking {table_name}')
+                    data = self.parse(table_name, '.txt', zfl)
+                    self.insert_data(con, 'lookup', data)
 
-        zf = zipfile.ZipFile(BytesIO(download()))
-        # zf = zipfile.ZipFile(BytesIO(read_local()))
+                tdy = datetime.date.today()
+                db_date = ((f'{tdy.month}/{tdy.day}/{tdy.year}',),)
+                # print(db_date)
+                self.insert_data(con, 'db_date', db_date)
 
-        self.main_app.update_status_display('Create database schema')
+                if self.main_app.aborted:
+                    return
 
-        with sqlite3.connect(":memory:") as con:
-            # create table / index
-            con.execute(self.CREATE_LOOKUP)
-            con.execute(self.INDEX_LOOKUP)
-            con.commit()
-
-            insert_data()
-
-            # delete any existing database file
-            try:
-                os.remove(self.DB)
-            except FileNotFoundError:
-                pass
-
-            con.execute(self.VACUUM)  # saves :memory: database to file
-
-        self.elapsed_time = time.time() - start
-
-    def get_db_data(self, query):
-        "get data from sqlite database"
-        with sqlite3.connect(self.DB) as con:
-            cursor = con.cursor()
-            try:
-                cursor.execute(query)
-                result = cursor.fetchone()
-            except sqlite3.OperationalError:
-                # handle case if database not properly loaded (i.e. empty)
-                result = None
-        return result
+                self.save_file(con, self.get_dbn())
+        self.end()
 
     def lookup(self, call):
         "lookup callsign record"
         lookup = self.get_db_data(
             f"select * from lookup where callsign='{call}'")
-        if lookup is None:
-            return None
-        else:
+        result = None
+        if lookup is not None:
             if lookup[12] == '':
                 name1 = ' '.join([i for i in lookup[1:3] if i > ''])
                 name2 = ''
                 address = lookup[3]
                 csz = f'{lookup[4]}, {lookup[5]}  {lookup[6]}'
-                op = 'Class: ' + ''.join(lookup[8:12])
+                opr = 'Class: ' + ''.join(lookup[8:12])
             else:
                 name1 = lookup[12]
                 name2 = lookup[13]
                 address = lookup[14]
                 csz = f'{lookup[15]}, {lookup[16]}  {lookup[17]}'
-                op = ''
+                opr = ''
 
-            return '\r'.join([i for i in (name1, name2, address, csz, ' ', op) if i > ''])
+            result = '\r'.join(
+                [i for i in (name1, name2, address, csz, ' ', opr) if i > ''])
+        return result
+
+    def get_dbn(self):
+        "get database name"
+        return self.working_folder('canada.sqlite')

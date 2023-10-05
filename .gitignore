@@ -6,5 +6,5 @@ _deps
 .DS_Store
 l_amat.zip
 amateur_delim.zip
-fcc.sqlite
-canada.sqlite
+l_amat*.zip
+*.sqlite
