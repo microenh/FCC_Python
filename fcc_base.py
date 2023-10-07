@@ -83,7 +83,6 @@ class FCCBase(DBBase):
 
                 self.save_file(con, self.get_dbn())
         self.end()
-        self.main_app.update_db_date(self.get_db_date())
 
     def lookup(self, call):
         "lookup callsign data"

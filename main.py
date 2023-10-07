@@ -37,14 +37,15 @@ class App(tk.Tk):
         frame2 = tk.Frame(frame, bg=BG_COLOR)
         frame2.pack(fill='x', padx=10, pady=10)
         for i in self.country_data:
-            ttk.Button(frame2, style='emoji.TButton', width=2, text=i.flag_text,
-                       command=lambda i=i: self.update_country(i)).pack(side='left', padx=(0, 4))
+            xfl = ttk.Button(frame2, style='emoji.TButton', width=2, text=i.flag_text,
+                             command=lambda i=i: self.update_country(i))
+            xfl.pack(side='left', padx=(0, 4))
+            xfl.bind('<Enter>', lambda evt, i=i: self.__show_date(evt, i))
         ttk.Label(frame2, style='small.TLabel', textvariable=self.update_status2).pack(
             side='left', padx=(10, 0))
 
         tk.Label(frame, image=self.image, bg=BG_COLOR).pack(pady=20)
-        self.update_db_date(self.country_data[0].get_db_date())
-        ttk.Label(frame, style='item.TLabel', textvariable=self.db_date).pack()
+
         frame2 = tk.Frame(frame, bg=BG_COLOR)
         frame2.pack()
         ttk.Label(frame2, style='item.TLabel',
@@ -115,12 +116,18 @@ class App(tk.Tk):
     def __callback(self):
         self.aborted = True
 
+    def __show_date(self, _, country_data):
+        db_date = country_data.get_db_date()
+        if db_date is None:
+            db_date = '<<Never>>'
+        self.update_status2.set(
+            f'{country_data.status_title}: updated {db_date}')
+
     def create_tk_vars(self):
         "initialize tk.vars"
         self.call_entry = tk.StringVar()
         self.display_call = tk.StringVar()
         self.lookup_result = tk.StringVar()
-        self.db_date = tk.StringVar()
         self.update_status = tk.StringVar()
         self.update_status.trace('w', lambda a, b, c: self.update())
         self.update_status2 = tk.StringVar()
@@ -142,11 +149,6 @@ class App(tk.Tk):
         if lookup_result is None:
             lookup_result = 'Not Found'
         self.lookup_result.set(lookup_result)
-
-    def update_db_date(self, db_date):
-        "update the database date display"
-        self.db_date.set(
-            '<< Nothing downloaded >>' if db_date is None else f'FCC Data from {db_date}')
 
     def update_country(self, country):
         "update the data for the country website"
