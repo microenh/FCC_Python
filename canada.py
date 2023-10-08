@@ -69,7 +69,8 @@ class CanadaData(DBBase):
                       if self.local_download > ''
                       else self.download(URL))
         if len(bytes_read) == 0:
-            self.update2.set('Error reading data')
+            self.update2.set('Aborted' if self.abort.get()
+                             else 'Error reading data')
             return
 
         with zipfile.ZipFile(BytesIO(bytes_read)) as zfl:

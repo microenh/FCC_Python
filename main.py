@@ -1,11 +1,11 @@
 "Amateur radio callsign lookup based on national callsign data"
 import os
 import tkinter as tk
-from tkinter import font, ttk
+from tkinter import ttk
 
 from PIL import Image, ImageTk
 
-from app_style import AppStyle
+from app_style import BG_COLOR, setup_styles
 from canada import CanadaData
 from fcc import FCCData
 from status_dialog import StatusDialog
@@ -17,7 +17,7 @@ class App(tk.Tk):
 
     def __init__(self):
         super().__init__()
-        self.setup_styles()
+        setup_styles()
         self.title("Amateur Radio Callgign Lookup")
         self.image = ImageTk.PhotoImage(Image.open(self.LOGO))
         self.after_idle(lambda: self.eval("tk::PlaceWindow . center"))
@@ -34,11 +34,11 @@ class App(tk.Tk):
         # for i in font.families():
         #     print(i)
 
-        frame = tk.Frame(self, width=400, height=500, bg=AppStyle.BG_COLOR)
+        frame = tk.Frame(self, width=400, height=500, bg=BG_COLOR)
         frame.grid(row=0, column=0, sticky='nsew')
         frame.pack_propagate(False)
 
-        frame2 = tk.Frame(frame, bg=AppStyle.BG_COLOR)
+        frame2 = tk.Frame(frame, bg=BG_COLOR)
         frame2.pack(fill='x', padx=10, pady=10)
         for i in self.country_data:
             xfl = ttk.Button(frame2, style='emoji.TButton', width=2, text=i.flag_text,
@@ -48,9 +48,9 @@ class App(tk.Tk):
         ttk.Label(frame2, style='small.TLabel', textvariable=self.update_status2).pack(
             side='left', padx=(10, 0))
 
-        tk.Label(frame, image=self.image, bg=AppStyle.BG_COLOR).pack(pady=20)
+        tk.Label(frame, image=self.image, bg=BG_COLOR).pack(pady=20)
 
-        frame2 = tk.Frame(frame, bg=AppStyle.BG_COLOR)
+        frame2 = tk.Frame(frame, bg=BG_COLOR)
         frame2.pack()
         ttk.Label(frame2, style='item.TLabel',
                   text='Enter callsign: ').pack(side='left')
@@ -71,42 +71,6 @@ class App(tk.Tk):
             db_date = '<<Never>>'
         self.update_status2.set(
             f'{country_data.status_title}: updated {db_date}')
-
-    def setup_styles(self):
-        "load styles"
-        style = ttk.Style()
-        menu_font = font.Font(family='TkMenuFont', size=14)
-        heading_font = font.Font(family='TkHeadingFont', size=20)
-        small_font = font.Font(family='TkMenuFont', size=8)
-
-        emoji_font = font.nametofont("TkDefaultFont")
-        emoji_font.configure(size=14)
-
-        style.theme_use('default')
-        self.windowingsystem = self.tk.call('tk', 'windowingsystem')
-        # win32 on windows, aqua on macos, x11 on Raspberry pi
-        style.configure('item.TLabel', foreground='white',
-                        background=AppStyle.BG_COLOR, font=menu_font)
-        style.configure('ingredient.TLabel', foreground='white',
-                        background=AppStyle.DARK_BG_COLOR, font=menu_font)
-        style.configure('heading.TLabel', foreground='yellow',
-                        background=AppStyle.BG_COLOR, font=heading_font)
-        style.configure('small.TButton', foreground='white',
-                        background=AppStyle.DARK_BG_COLOR, font=menu_font)
-        style.configure('emoji.TButton', foreground='white',
-                        background=AppStyle.DARK_BG_COLOR, font=emoji_font)
-        style.configure('large.TButton', foreground='white',
-                        background=AppStyle.DARK_BG_COLOR, font=heading_font)
-        style.configure('small.TLabel', foreground='white',
-                        background=AppStyle.BG_COLOR, font=small_font)
-        style.configure('new.TEntry', foreground='black',
-                        background='white', insertcolor='black', insertwidth='1')
-
-        style.configure('red.Horizontal.TProgressbar',
-                        troughcolor=AppStyle.BG_COLOR,
-                        lightcolor=AppStyle.BG_COLOR,
-                        darkcolor=AppStyle.DARK_BG_COLOR,
-                        background=AppStyle.DARK_BG_COLOR)
 
     def create_tk_vars(self):
         "initialize tk.vars"

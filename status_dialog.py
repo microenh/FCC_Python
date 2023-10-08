@@ -2,7 +2,7 @@
 import tkinter as tk
 from tkinter import ttk
 
-from app_style import AppStyle
+from app_style import BG_COLOR
 
 
 class StatusDialog(tk.Toplevel):
@@ -18,7 +18,7 @@ class StatusDialog(tk.Toplevel):
         self.protocol("WM_DELETE_WINDOW",
                       lambda: self.abort_var.set(True))
 
-        frame = tk.Frame(self, bg=AppStyle.BG_COLOR)
+        frame = tk.Frame(self, bg=BG_COLOR)
         frame.pack(expand=True, fill=tk.BOTH)
 
         ttk.Label(frame, style='item.TLabel',
