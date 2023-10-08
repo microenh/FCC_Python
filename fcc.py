@@ -10,8 +10,8 @@ from fcc_text import (CREATE_AM, CREATE_EN, CREATE_HD, CREATE_LOOKUP,
 class FCCData(FCCBase):
     """main class"""
 
-    def __init__(self, main_app):
-        super().__init__(main_app)
+    def __init__(self, update_var, update2_var, progress_var, abort_var):
+        super().__init__(update_var, update2_var, progress_var, abort_var)
 
         temp = 'temp'
         self.create = (CREATE_AM % temp, CREATE_EN % temp,

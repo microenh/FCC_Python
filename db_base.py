@@ -16,8 +16,11 @@ CREATE_DB_DATE = """
 class DBBase:
     """base class"""
 
-    def __init__(self, update_app):
-        self.update_app = update_app
+    def __init__(self, update_var, update2_var, progress_var, abort_var):
+        self.update_var = update_var
+        self.update2 = update2_var
+        self.progress = progress_var
+        self.abort = abort_var
         self.start = 0.0
 
     def begin(self):
@@ -27,14 +30,14 @@ class DBBase:
     def end(self):
         "finish processing"
         elapsed_time = time.time() - self.start
-        self.update_app.update_status2.set(
+        self.update2.set(
             f'Done in {int(elapsed_time)} seconds')
 
     def create_tables(self, con, create_tables):
         "build the database"
-        self.update_app.update_status.set('Create database schema')
+        self.update_var.set('Create database schema')
         for i in create_tables:
-            if self.update_app.aborted:
+            if self.abort.get():
                 return
             con.execute(i)
         con.commit()
@@ -46,27 +49,27 @@ class DBBase:
 
     def insert_data(self, con, table_name, data):
         "insert data into sqlite database"
-        self.update_app.update_status.set(f'Importing {table_name}')
+        self.update_var.set(f'Importing {table_name}')
         field_count = len(data[0])
         stmt = f"insert into {table_name} values ({','.join(['?'] * field_count)});"
         # self.update_app.set_progressbar_max(len(data))
         total_rows = len(data)
         j = 0
         for i in data:
-            if self.update_app.aborted:
+            if self.abort.get():
                 return
             if j % 8000 == 0:
-                self.update_app.progress.set(j * 100 / total_rows)
+                self.progress.set(j * 100 / total_rows)
             if len(i) == field_count:
                 con.execute(stmt, i)
             j += 1
-        self.update_app.progress.set(0)
-        self.update_app.update_status.set('')
+        self.progress.set(0)
+        self.update_var.set('')
         con.commit()
 
     def save_file(self, con, file_name):
         """save the memory database to disk"""
-        self.update_app.update_status.set('Saving databse')
+        self.update_var.set('Saving databse')
 
         # delete any existing database file
         try:
@@ -78,7 +81,7 @@ class DBBase:
 
     def download(self, url):
         "download data from government's website"
-        self.update_app.update_status.set('Downloading')
+        self.update_var.set('Downloading')
         chunk_size = 1024 * 1024
         result = bytearray()
         try:
@@ -91,12 +94,12 @@ class DBBase:
         # self.update_app.progress.set(total_size_in_bytes)
         total = 0
         for data in response.iter_content(chunk_size=chunk_size):
-            self.update_app.progress.set(total * 100 / total_size_in_bytes)
-            if self.update_app.aborted:
+            self.progress.set(total * 100 / total_size_in_bytes)
+            if self.abort.get():
                 return result
             received += data
             total += chunk_size
-        self.update_app.progress.set(0)
+        self.progress.set(0)
         return received
 
     def get_dbn(self):

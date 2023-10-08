@@ -43,8 +43,8 @@ FLAG = flag.flag('CA')
 class CanadaData(DBBase):
     """process data from Canada"""
 
-    def __init__(self, main_app):
-        super().__init__(main_app)
+    def __init__(self, update_var, update2_var, progress_var, abort_var):
+        super().__init__(update_var, update2_var, progress_var, abort_var)
         self.create = (CREATE_LOOKUP, INDEX_LOOKUP, CREATE_DB_DATE)
         self.table_names = ('amateur_delim',)
         self.permanent_names = ()
@@ -54,7 +54,6 @@ class CanadaData(DBBase):
         self.local_download = ''
         # self.local_download = self.working_folder("amateur_delim.zip")
 
-        self.main_app = main_app
         self.elapsed_time = 0
 
     def parse(self, table_name, suffix, data):
@@ -70,7 +69,7 @@ class CanadaData(DBBase):
                       if self.local_download > ''
                       else self.download(URL))
         if len(bytes_read) == 0:
-            self.main_app.update_status2.set('Error reading data')
+            self.update2.set('Error reading data')
             return
 
         with zipfile.ZipFile(BytesIO(bytes_read)) as zfl:
@@ -78,14 +77,14 @@ class CanadaData(DBBase):
 
                 # create tables
                 self.create_tables(con, self.create)
-                if self.main_app.aborted:
+                if self.abort.get():
                     return
 
                 # insert data from FCC data
                 for table_name in self.table_names:
-                    if self.main_app.aborted:
+                    if self.abort.get():
                         return
-                    self.main_app.update_status.set(
+                    self.update_var.set(
                         f'Unpacking {table_name}')
                     data = self.parse(table_name, '.txt', zfl)
                     self.insert_data(con, 'lookup', data)
@@ -95,7 +94,7 @@ class CanadaData(DBBase):
                 # print(db_date)
                 self.insert_data(con, 'db_date', db_date)
 
-                if self.main_app.aborted:
+                if self.abort.get():
                     return
 
                 self.save_file(con, self.get_dbn())
