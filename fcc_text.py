@@ -1,7 +1,5 @@
 "Data common to fcc.py and fcc_full.py"
 
-import flag
-
 CREATE_AM = """
     create %s table AM
     (
@@ -289,10 +287,6 @@ CREATE_LOOKUP_VIEW = """
             inner join AM on HD.unique_system_identifier = AM.unique_system_identifier
         where HD.license_status = "A";
 """
-
-URL = 'https://data.fcc.gov/download/pub/uls/complete/l_amat.zip'
-COUNTRY = 'US'
-FLAG = flag.flag('US')
 
 op_class = {'A': 'Advanced',
             'E': 'Amateur Extra',

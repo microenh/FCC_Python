@@ -10,8 +10,8 @@ class StatusDialog(tk.Toplevel):
 
     def __init__(self, master, title, status_var, progress_var, abort_var):
         super().__init__(master)
+        self.minsize(300, 0)
         self.title(title)
-        self.geometry('300x300')
         self.abort_var = abort_var
         self.abort_var.set(False)
 
@@ -29,6 +29,5 @@ class StatusDialog(tk.Toplevel):
             variable=progress_var, orient=tk.HORIZONTAL)
         self.progressbar.pack(side=tk.TOP, fill=tk.X, padx=10, pady=10)
 
-        self.grab_set()
         self.after_idle(
             lambda: master.eval(f"tk::PlaceWindow {str(self)} center"))

@@ -7,6 +7,7 @@ from PIL import Image, ImageTk
 
 from app_style import BG_COLOR, setup_styles
 from canada import CanadaData
+from db_base import Notifications
 from fcc import FCCData
 from status_dialog import StatusDialog
 
@@ -22,14 +23,12 @@ class App(tk.Tk):
         self.image = ImageTk.PhotoImage(Image.open(self.LOGO))
         self.after_idle(lambda: self.eval("tk::PlaceWindow . center"))
         self.create_tk_vars()
-        self.country_data = (FCCData(self.update_status,
-                                     self.update_status2,
-                                     self.progress,
-                                     self.aborted),
-                             CanadaData(self.update_status,
-                                        self.update_status2,
-                                        self.progress,
-                                        self.aborted))
+        notifications = Notifications(self.update_status,
+                                      self.progress,
+                                      self.aborted,
+                                      self.status)
+        self.country_data = (FCCData(notifications),
+                             CanadaData(notifications))
 
         # for i in font.families():
         #     print(i)
@@ -41,7 +40,8 @@ class App(tk.Tk):
         frame2 = tk.Frame(frame, bg=BG_COLOR)
         frame2.pack(fill='x', padx=10, pady=10)
         for i in self.country_data:
-            xfl = ttk.Button(frame2, style='emoji.TButton', width=2, text=i.flag_text,
+            xfl = ttk.Button(frame2, style='emoji.TButton',
+                             width=2, text=i.flag,
                              command=lambda i=i: self.update_country(i))
             xfl.pack(side='left', padx=(0, 4))
             xfl.bind('<Enter>', lambda evt, i=i: self.__show_date(evt, i))
@@ -70,7 +70,7 @@ class App(tk.Tk):
         if db_date is None:
             db_date = '<<Never>>'
         self.update_status2.set(
-            f'{country_data.status_title}: updated {db_date}')
+            f'{country_data.country}: updated {db_date}')
 
     def create_tk_vars(self):
         "initialize tk.vars"
@@ -80,13 +80,14 @@ class App(tk.Tk):
         self.update_status = tk.StringVar()
         self.update_status.trace('w', lambda a, b, c: self.update())
         self.update_status2 = tk.StringVar()
+        self.status = tk.StringVar()
         self.progress = tk.IntVar()
         self.progress.trace('w', lambda a, b, c: self.update())
         self.aborted = tk.BooleanVar()
 
     def lookup(self, _):
         "get data from database"
-        self.update_status2.set('')      # clear elapsed time display
+        self.update_status2.set('')      # status display
         call = self.call_entry.get().upper()
         self.call_entry.set('')
         self.display_call.set(call)
@@ -102,11 +103,15 @@ class App(tk.Tk):
 
     def update_country(self, country):
         "update the data for the country website"
-        status_dialog = StatusDialog(self, f'Updating {country.status_title}',
+        status_dialog = StatusDialog(self, f'Updating {country.country}',
                                      self.update_status, self.progress, self.aborted)
+        status_dialog.grab_set()
+
         country.update()
         status_dialog.grab_release()
         status_dialog.withdraw()
+        self.update_status2.set('aborted' if self.aborted.get()
+                                else self.status.get())
 
 
 # create and run

@@ -9,18 +9,29 @@ from fcc_text import (CREATE_AM, CREATE_CO, CREATE_EN, CREATE_HD, CREATE_HS,
 class FCCData(FCCBase):
     """main class"""
 
-    def __init__(self, update_var, update2_var, progress_var, abort_var):
-        "init"
-        super().__init__(update_var, update2_var, progress_var, abort_var)
+    # def __init__(self, notifications):
+    #     super().__init__(notifications)
 
-        temp = ''
-        self.create = (CREATE_AM % temp, CREATE_EN % temp,
-                       CREATE_HD % temp, CREATE_DB_DATE,
-                       CREATE_CO, CREATE_HS, CREATE_LA, CREATE_SC, CREATE_SF,
-                       CREATE_LOOKUP_VIEW)
-        self.table_names = ('AM', 'EN', 'HD', 'CO', 'HS', 'LA', 'SC', 'SF')
-        self.permanent_names = ()
-
-    def get_dbn(self):
+    @property
+    def dbn(self):
         "get database name"
         return self.working_folder('fcc_full.sqlite')
+
+    @property
+    def stage1(self):
+        "1st stage database commands"
+        temp = ''
+        return (CREATE_AM % temp, CREATE_EN % temp,
+                CREATE_HD % temp, CREATE_DB_DATE,
+                CREATE_CO, CREATE_HS, CREATE_LA, CREATE_SC, CREATE_SF,
+                CREATE_LOOKUP_VIEW)
+
+    @property
+    def download_names(self):
+        "tables in database download"
+        return ('AM', 'EN', 'HD', 'CO', 'HS', 'LA', 'SC', 'SF')
+
+    @property
+    def stage2(self):
+        "2nd stage database commands"
+        return ()

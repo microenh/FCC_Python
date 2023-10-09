@@ -3,6 +3,9 @@
 import os
 import sqlite3
 import time
+import zipfile
+from abc import ABC, abstractmethod
+from io import BytesIO
 
 import requests
 
@@ -13,34 +16,91 @@ CREATE_DB_DATE = """
 """
 
 
-class DBBase:
+class Notifications():
+    "group TkVar's"
+
+    def __init__(self, update, progress, abort, status):
+        self.update = update
+        self.progress = progress
+        self.abort = abort
+        self.status = status
+
+
+class DBBase(ABC):
     """base class"""
 
-    def __init__(self, update_var, update2_var, progress_var, abort_var):
-        self.update_var = update_var
-        self.update2 = update2_var
-        self.progress = progress_var
-        self.abort = abort_var
+    @property
+    @abstractmethod
+    def dbn(self) -> str:
+        "abstract"
+
+    @property
+    @abstractmethod
+    def url(self) -> str:
+        "abstract"
+
+    @property
+    @abstractmethod
+    def country(self) -> str:
+        "abstract"
+
+    @property
+    @abstractmethod
+    def flag(self) -> str:
+        "abstract"
+
+    @property
+    @abstractmethod
+    def local_download(self) -> str:
+        "abstract"
+
+    @property
+    @abstractmethod
+    def stage1(self) -> tuple[str, ...]:
+        "abstract"
+
+    @property
+    @abstractmethod
+    def stage2(self) -> tuple[str, ...]:
+        "abstract"
+
+    @property
+    @abstractmethod
+    def download_names(self) -> tuple[str, ...]:
+        "abstract"
+
+    @property
+    @abstractmethod
+    def download_extension(self) -> str:
+        "abstract"
+
+    @abstractmethod
+    def parse_db_date(self, data) -> str:
+        "abstract"
+
+    @abstractmethod
+    def parse(self, table_name, suffix, data):
+        "abstract"
+
+    def __init__(self, notifications):
+        self.notifications = notifications
         self.start = 0.0
 
-    def begin(self):
+    def start_timing(self):
         "initialze elapsed time counter"
         self.start = time.time()
 
-    def end(self):
+    def end_timing(self):
         "finish processing"
-        elapsed_time = time.time() - self.start
-        self.update2.set(
-            f'Done in {int(elapsed_time)} seconds')
+        return int(time.time() - self.start)
 
-    def create_tables(self, con, create_tables):
-        "build the database"
-        self.update_var.set('Create database schema')
+    def db_commands(self, con, create_tables):
+        "execute database commands"
         for i in create_tables:
-            if self.abort.get():
+            if self.notifications.abort.get():
                 return
             con.execute(i)
-        con.commit()
+            con.commit()
 
     @classmethod
     def working_folder(cls, filename):
@@ -49,27 +109,27 @@ class DBBase:
 
     def insert_data(self, con, table_name, data):
         "insert data into sqlite database"
-        self.update_var.set(f'Importing {table_name}')
+        self.notifications.update.set(f'Importing {table_name}')
         field_count = len(data[0])
         stmt = f"insert into {table_name} values ({','.join(['?'] * field_count)});"
         # self.update_app.set_progressbar_max(len(data))
         total_rows = len(data)
         j = 0
         for i in data:
-            if self.abort.get():
+            if self.notifications.abort.get():
                 return
             if j % 8000 == 0:
-                self.progress.set(j * 100 / total_rows)
+                self.notifications.progress.set(j * 100 / total_rows)
             if len(i) == field_count:
                 con.execute(stmt, i)
             j += 1
-        self.progress.set(0)
-        self.update_var.set('')
+        self.notifications.progress.set(0)
+        self.notifications.update.set('')
         con.commit()
 
     def save_file(self, con, file_name):
         """save the memory database to disk"""
-        self.update_var.set('Saving databse')
+        self.notifications.update.set('Saving databse')
 
         # delete any existing database file
         try:
@@ -81,7 +141,7 @@ class DBBase:
 
     def download(self, url):
         "download data from government's website"
-        self.update_var.set('Downloading')
+        self.notifications.update.set('Downloading')
         chunk_size = 1024 * 1024
         result = bytearray()
         try:
@@ -94,17 +154,13 @@ class DBBase:
         # self.update_app.progress.set(total_size_in_bytes)
         total = 0
         for data in response.iter_content(chunk_size=chunk_size):
-            self.progress.set(total * 100 / total_size_in_bytes)
-            if self.abort.get():
+            self.notifications.progress.set(total * 100 / total_size_in_bytes)
+            if self.notifications.abort.get():
                 return result
             received += data
             total += chunk_size
-        self.progress.set(0)
+        self.notifications.progress.set(0)
         return received
-
-    def get_dbn(self):
-        "overridden in child"
-        return ''
 
     @classmethod
     def read_local(cls, file_name):
@@ -116,9 +172,53 @@ class DBBase:
             data = bytes()
         return data
 
+    def update(self):
+        """Populate canada.sqlite with data downloaded from Canada"""
+        self.start_timing()
+
+        bytes_read = (self.read_local(self.local_download)
+                      if self.local_download > ''
+                      else self.download(self.url))
+        if len(bytes_read) == 0:
+            self.notifications.status.set('Error reading data')
+            return
+
+        with zipfile.ZipFile(BytesIO(bytes_read)) as zfl:
+            with sqlite3.connect(":memory:") as con:
+
+                # create tables
+                self.notifications.update.set('1st stage db commands')
+
+                self.db_commands(con, self.stage1)
+                if self.notifications.abort.get():
+                    return
+
+                # insert data from FCC data
+                for table_name in self.download_names:
+                    if self.notifications.abort.get():
+                        return
+                    self.notifications.update.set(
+                        f'Unpacking {table_name}')
+                    data = self.parse(table_name, self.download_extension, zfl)
+                    self.insert_data(con, table_name, data)
+
+                self.notifications.update.set('update db date')
+                self.insert_data(con, 'db_date', self.parse_db_date(zfl))
+                if self.notifications.abort.get():
+                    return
+                con.commit()
+
+                self.notifications.update.set('2nd stage db commands')
+                self.db_commands(con, self.stage2)
+
+                if self.notifications.abort.get():
+                    return
+
+                self.save_file(con, self.dbn)
+
     def get_db_data(self, query):
         "get data from sqlite database"
-        with sqlite3.connect(self.get_dbn()) as con:
+        with sqlite3.connect(self.dbn) as con:
             cursor = con.cursor()
             try:
                 cursor.execute(query)

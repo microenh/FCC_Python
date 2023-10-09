@@ -1,88 +1,21 @@
 " manage US data imported from FCC using small sqlite setup"
 
-import sqlite3
-import zipfile
-from io import BytesIO
+import flag
 
 from db_base import DBBase
-from fcc_text import COUNTRY, FLAG, URL, months, op_class
+from fcc_text import months, op_class
 
 
 class FCCBase(DBBase):
     """main class"""
 
-    def __init__(self, update_var, update2_var, progress_var, abort_var):
-        super().__init__(update_var, update2_var, progress_var, abort_var)
-        self.create = ()
-        self.table_names = ()
-        self.permanent_names = ()
-        self.status_title = COUNTRY
-        self.flag_text = FLAG
-
-        self.local_download = ''
-        # self.local_download = self.working_folder("l_amat_230924.zip")
-
-        self.elapsed_time = 0
+    # def __init__(self, notifications):
+    #     super().__init__(notifications)
 
     def parse(self, table_name, suffix, data):
         "extract records from file in zip archive"
         return [i.split('|') for i in str(data.read(
             table_name + suffix), encoding='UTF-8').replace('"', '').split('\r\n')[:-1]]
-
-    def update(self):
-        """Populate fcc.sqlite database with data downloaded from FCC."""
-
-        self.begin()
-
-        bytes_read = (self.read_local(self.local_download)
-                      if self.local_download > ''
-                      else self.download(URL))
-        if len(bytes_read) == 0:
-            self.update2.set('Aborted' if self.abort.get()
-                             else 'Error reading data')
-            return
-
-        with zipfile.ZipFile(BytesIO(bytes_read)) as zfl:
-            with sqlite3.connect(":memory:") as con:
-
-                # create tables
-                self.create_tables(con, self.create)
-                if self.abort.get():
-                    return
-
-                # insert data from FCC data
-                for table_name in self.table_names:
-                    if self.abort.get():
-                        return
-                    self.update_var.set(
-                        f'Unpacking {table_name}')
-                    data = self.parse(table_name, '.dat', zfl)
-                    self.insert_data(con, table_name, data)
-
-                self.update_var.set('Unpacking counts')
-                date_data = self.parse('counts', '', zfl)[0][0].split(' ')
-                date_data = [i for i in date_data if i > '']
-                # print(date_data)
-                # ['File', 'Creation', 'Date:', 'Sun', 'Sep', '24', '16:57:01', 'EDT', '2023']
-                db_date = (
-                    (f'{months[date_data[4].upper()]}/{date_data[5]}/{date_data[8]}',),)
-                # print(db_date)
-                self.insert_data(con, 'db_date', db_date)
-
-                if self.abort.get():
-                    return
-
-                self.update_var.set('Building database')
-
-                # update permanent
-                for i in self.permanent_names:
-                    con.execute(i)
-                    con.commit()
-                if self.abort.get():
-                    return
-
-                self.save_file(con, self.get_dbn())
-        self.end()
 
     def lookup(self, call):
         "lookup callsign data"
@@ -103,3 +36,35 @@ class FCCBase(DBBase):
             result = '\r'.join([i for i in (name, pob, lookup[15], csz, ' ',
                                             vanity, opc, expires) if i > ''])
         return result
+
+    @property
+    def url(self):
+        "url for download"
+        return 'https://data.fcc.gov/download/pub/uls/complete/l_amat.zip'
+
+    @property
+    def country(self):
+        "country name"
+        return 'US'
+
+    @property
+    def flag(self):
+        "country Unicode flag id"
+        return flag.flag('US')
+
+    @property
+    def local_download(self):
+        "local copy of download file for testing"
+        # return self.working_folder("l_amat_230924.zip")
+        return ''
+
+    @property
+    def download_extension(self):
+        "extension in download file"
+        return '.dat'
+
+    def parse_db_date(self, data):
+        "get date from counts table"
+        date_data = self.parse('counts', '', data)[0][0].split(' ')
+        date_data = [i for i in date_data if i > '']
+        return ((f'{months[date_data[4].upper()]}/{date_data[5]}/{date_data[8]}',),)
