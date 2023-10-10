@@ -106,10 +106,11 @@ class App(tk.Tk):
         status_dialog = StatusDialog(self, f'Updating {country.country}',
                                      self.update_status, self.progress, self.aborted)
         status_dialog.grab_set()
-
+        status_dialog.transient(self)
         country.update()
-        status_dialog.grab_release()
-        status_dialog.withdraw()
+        status_dialog.destroy()
+        # status_dialog.grab_release()
+        # status_dialog.withdraw()
         self.update_status2.set('aborted' if self.aborted.get()
                                 else self.status.get())
 
