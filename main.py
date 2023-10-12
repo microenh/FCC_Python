@@ -1,8 +1,6 @@
 "Amateur radio callsign lookup based on national callsign data"
 import os
 import tkinter as tk
-from queue import SimpleQueue
-from threading import Thread
 from tkinter import ttk
 
 from PIL import Image, ImageTk
@@ -13,6 +11,12 @@ from db_base import Notifications
 from fcc import FCCData
 from status_dialog import StatusDialog
 from ticket import Ticket, TicketType
+
+MULTI_THREADING = False
+
+if MULTI_THREADING:
+    from queue import SimpleQueue
+    from threading import Thread
 
 
 class App(tk.Tk):
@@ -34,8 +38,9 @@ class App(tk.Tk):
         # for i in font.families():
         #     print(i)
 
-        self.queue = SimpleQueue()
-        self.bind('<<Update Status>>', self.handle_update_event)
+        if MULTI_THREADING:
+            self.queue = SimpleQueue()
+            self.bind('<<Update Status>>', self.handle_update_event)
         frame = tk.Frame(self, width=400, height=500, bg=BG_COLOR)
         frame.grid(row=0, column=0, sticky='nsew')
         frame.pack_propagate(False)
@@ -71,12 +76,18 @@ class App(tk.Tk):
     def update_status_display(self, which, value):
         "update data from status dialog"
         ticket = Ticket(which, value)
-        self.queue.put(ticket)
-        self.event_generate('<<Update Status>>')
+        if MULTI_THREADING:
+            self.queue.put(ticket)
+            self.event_generate('<<Update Status>>')
+        else:
+            self.handle_ticket(ticket)
 
-    def handle_update_event(self, _):
+    def handle_update_event(self, ticket):
         "update display with results from status dialog"
         ticket = self.queue.get()
+        self.handle_ticket(ticket)
+
+    def handle_ticket(self, ticket):
         match ticket.ticket_type:
             case TicketType.STATUS:
                 self.update_status.set(ticket.value)
@@ -100,12 +111,13 @@ class App(tk.Tk):
         self.display_call = tk.StringVar()
         self.lookup_result = tk.StringVar()
         self.update_status = tk.StringVar()
-        # self.update_status.trace('w', lambda a, b, c: self.update())
         self.update_status2 = tk.StringVar()
         self.status = tk.StringVar()
         self.progress = tk.IntVar()
-        # self.progress.trace('w', lambda a, b, c: self.update())
         self.aborted = tk.BooleanVar()
+        if not MULTI_THREADING:
+            self.progress.trace('w', lambda a, b, c: self.update())
+            self.update_status.trace('w', lambda a, b, c: self.update())
 
     def lookup(self, _):
         "get data from database"
@@ -124,17 +136,21 @@ class App(tk.Tk):
         self.lookup_result.set(lookup_result)
 
     def update_country(self, country):
-        "launch thread"
-        update_thread = Thread(target=self.update_country_thread,
-                               args=(country,),
-                               daemon=True)
-        update_thread.start()
+        "update"
+        if MULTI_THREADING:
+            update_thread = Thread(target=self.update_country_thread,
+                                   args=(country,),
+                                   daemon=True)
+            update_thread.start()
+        else:
+            self.update_country_thread(country)
 
     def update_country_thread(self, country):
         "update the data for the country website"
         status_dialog = StatusDialog(self, f'Updating {country.country}',
                                      self.update_status, self.progress, self.aborted)
-        # status_dialog.grab_set()
+        if not MULTI_THREADING:
+            status_dialog.grab_set()
         status_dialog.transient(self)
         country.update()
 
