@@ -88,6 +88,7 @@ class App(tk.Tk):
         self.handle_ticket(ticket)
 
     def handle_ticket(self, ticket):
+        "update per ticket info"
         match ticket.ticket_type:
             case TicketType.STATUS:
                 self.update_status.set(ticket.value)
