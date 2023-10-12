@@ -1,6 +1,8 @@
 "Amateur radio callsign lookup based on national callsign data"
 import os
 import tkinter as tk
+from queue import SimpleQueue
+from threading import Thread
 from tkinter import ttk
 
 from PIL import Image, ImageTk
@@ -10,6 +12,7 @@ from canada import CanadaData
 from db_base import Notifications
 from fcc import FCCData
 from status_dialog import StatusDialog
+from ticket import Ticket, TicketType
 
 
 class App(tk.Tk):
@@ -23,16 +26,16 @@ class App(tk.Tk):
         self.image = ImageTk.PhotoImage(Image.open(self.LOGO))
         self.after_idle(lambda: self.eval("tk::PlaceWindow . center"))
         self.create_tk_vars()
-        notifications = Notifications(self.update_status,
-                                      self.progress,
-                                      self.aborted,
-                                      self.status)
+        notifications = Notifications(self.update_status_display,
+                                      self.aborted)
         self.country_data = (FCCData(notifications),
                              CanadaData(notifications))
 
         # for i in font.families():
         #     print(i)
 
+        self.queue = SimpleQueue()
+        self.bind('<<Update Status>>', self.handle_update_event)
         frame = tk.Frame(self, width=400, height=500, bg=BG_COLOR)
         frame.grid(row=0, column=0, sticky='nsew')
         frame.pack_propagate(False)
@@ -65,6 +68,25 @@ class App(tk.Tk):
         ttk.Label(frame, style='item.TLabel',
                   textvariable=self.lookup_result).pack(pady=(10, 0))
 
+    def update_status_display(self, which, value):
+        "update data from status dialog"
+        ticket = Ticket(which, value)
+        self.queue.put(ticket)
+        self.event_generate('<<Update Status>>')
+
+    def handle_update_event(self, _):
+        "update display with results from status dialog"
+        ticket = self.queue.get()
+        match ticket.ticket_type:
+            case TicketType.STATUS:
+                self.update_status.set(ticket.value)
+            case TicketType.PROGRESS:
+                self.progress.set(ticket.value)
+            case TicketType.DONE:
+                pass
+            case TicketType.RESULT:
+                self.status.set(ticket.value)
+
     def __show_date(self, _, country_data):
         db_date = country_data.get_db_date()
         if db_date is None:
@@ -78,11 +100,11 @@ class App(tk.Tk):
         self.display_call = tk.StringVar()
         self.lookup_result = tk.StringVar()
         self.update_status = tk.StringVar()
-        self.update_status.trace('w', lambda a, b, c: self.update())
+        # self.update_status.trace('w', lambda a, b, c: self.update())
         self.update_status2 = tk.StringVar()
         self.status = tk.StringVar()
         self.progress = tk.IntVar()
-        self.progress.trace('w', lambda a, b, c: self.update())
+        # self.progress.trace('w', lambda a, b, c: self.update())
         self.aborted = tk.BooleanVar()
 
     def lookup(self, _):
@@ -102,15 +124,21 @@ class App(tk.Tk):
         self.lookup_result.set(lookup_result)
 
     def update_country(self, country):
+        "launch thread"
+        update_thread = Thread(target=self.update_country_thread,
+                               args=(country,),
+                               daemon=True)
+        update_thread.start()
+
+    def update_country_thread(self, country):
         "update the data for the country website"
         status_dialog = StatusDialog(self, f'Updating {country.country}',
                                      self.update_status, self.progress, self.aborted)
-        status_dialog.grab_set()
+        # status_dialog.grab_set()
         status_dialog.transient(self)
         country.update()
+
         status_dialog.destroy()
-        # status_dialog.grab_release()
-        # status_dialog.withdraw()
         self.update_status2.set('aborted' if self.aborted.get()
                                 else self.status.get())
 

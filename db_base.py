@@ -9,6 +9,8 @@ from io import BytesIO
 
 import requests
 
+from ticket import TicketType
+
 CREATE_DB_DATE = """
     create table db_date(
         date text
@@ -19,11 +21,9 @@ CREATE_DB_DATE = """
 class Notifications():
     "group TkVar's"
 
-    def __init__(self, update, progress, abort, status):
+    def __init__(self, update, abort):
         self.update = update
-        self.progress = progress
         self.abort = abort
-        self.status = status
 
 
 class DBBase(ABC):
@@ -86,14 +86,6 @@ class DBBase(ABC):
         self.notifications = notifications
         self.start = 0.0
 
-    def start_timing(self):
-        "initialze elapsed time counter"
-        self.start = time.time()
-
-    def end_timing(self):
-        "finish processing"
-        return int(time.time() - self.start)
-
     def db_commands(self, con, create_tables):
         "execute database commands"
         for i in create_tables:
@@ -107,29 +99,39 @@ class DBBase(ABC):
         "compute working folder relative to main script"
         return os.path.join(os.path.dirname(__file__), filename)
 
+    def do_notify(self, which, value):
+        "handle notification"
+        self.notifications.update(which, value)
+
     def insert_data(self, con, table_name, data):
         "insert data into sqlite database"
-        self.notifications.update.set(f'Importing {table_name}')
+        # self.notifications.update.set(f'Importing {table_name}')
+        self.do_notify(TicketType.STATUS, f'Importing {table_name}')
         field_count = len(data[0])
         stmt = f"insert into {table_name} values ({','.join(['?'] * field_count)});"
-        # self.update_app.set_progressbar_max(len(data))
         total_rows = len(data)
+        chunk_rows = max(1, total_rows // 100)
         j = 0
+        k = 0
         for i in data:
             if self.notifications.abort.get():
                 return
-            if j % 8000 == 0:
-                self.notifications.progress.set(j * 100 / total_rows)
+            if j % chunk_rows == 0:
+                # self.notifications.progress.set(j * 100 / total_rows)
+                self.do_notify(TicketType.PROGRESS, k)
+                k += 1
             if len(i) == field_count:
                 con.execute(stmt, i)
             j += 1
-        self.notifications.progress.set(0)
-        self.notifications.update.set('')
+        # self.notifications.progress.set(0)
+        # self.notifications.update.set('')
+        self.do_notify(TicketType.PROGRESS, 0)
+        self.do_notify(TicketType.STATUS, '')
         con.commit()
 
     def save_file(self, con, file_name):
         """save the memory database to disk"""
-        self.notifications.update.set('Saving databse')
+        self.do_notify(TicketType.STATUS, 'Saving databse')
 
         # delete any existing database file
         try:
@@ -141,8 +143,8 @@ class DBBase(ABC):
 
     def download(self, url):
         "download data from government's website"
-        self.notifications.update.set('Downloading')
-        chunk_size = 1024 * 1024
+        # self.notifications.update.set('Downloading')
+        self.do_notify(TicketType.STATUS, 'Downloading')
         result = bytearray()
         try:
             response = requests.get(url, stream=True, timeout=10)
@@ -151,15 +153,14 @@ class DBBase(ABC):
         received = bytearray()
         total_size_in_bytes = int(
             response.headers.get('content-length', 0))
-        # self.update_app.progress.set(total_size_in_bytes)
-        total = 0
-        for data in response.iter_content(chunk_size=chunk_size):
-            self.notifications.progress.set(total * 100 / total_size_in_bytes)
+        pct = 0
+        for data in response.iter_content(chunk_size=total_size_in_bytes // 100):
+            self.do_notify(TicketType.PROGRESS, pct)
             if self.notifications.abort.get():
                 return result
             received += data
-            total += chunk_size
-        self.notifications.progress.set(0)
+            pct += 1
+        self.do_notify(TicketType.PROGRESS, 0)
         return received
 
     @classmethod
@@ -174,20 +175,22 @@ class DBBase(ABC):
 
     def update(self):
         """Populate canada.sqlite with data downloaded from Canada"""
-        self.start_timing()
+        start = time.time()
 
         bytes_read = (self.read_local(self.local_download)
                       if self.local_download > ''
                       else self.download(self.url))
         if len(bytes_read) == 0:
-            self.notifications.status.set('Error reading data')
+            # self.notifications.status.set('Error reading data')
+            self.do_notify(TicketType.RESULT, 'Error reading data')
             return
 
         with zipfile.ZipFile(BytesIO(bytes_read)) as zfl:
             with sqlite3.connect(":memory:") as con:
 
                 # create tables
-                self.notifications.update.set('1st stage db commands')
+                # self.notifications.update.set('1st stage db commands')
+                self.do_notify(TicketType.STATUS, '1st stage db commands')
 
                 self.db_commands(con, self.stage1)
                 if self.notifications.abort.get():
@@ -197,24 +200,29 @@ class DBBase(ABC):
                 for table_name in self.download_names:
                     if self.notifications.abort.get():
                         return
-                    self.notifications.update.set(
-                        f'Unpacking {table_name}')
+                    # self.notifications.update.set(f'Unpacking {table_name}')
+                    self.do_notify(TicketType.STATUS,
+                                   f'Unpacking {table_name}')
                     data = self.parse(table_name, self.download_extension, zfl)
                     self.insert_data(con, table_name, data)
 
-                self.notifications.update.set('update db date')
+                # self.notifications.update.set('update db date')
+                self.do_notify(TicketType.STATUS, 'update db date')
                 self.insert_data(con, 'db_date', self.parse_db_date(zfl))
                 if self.notifications.abort.get():
                     return
                 con.commit()
 
-                self.notifications.update.set('2nd stage db commands')
+                # self.notifications.update.set('2nd stage db commands')
+                self.do_notify(TicketType.STATUS, '2nd stage db commands')
                 self.db_commands(con, self.stage2)
 
                 if self.notifications.abort.get():
                     return
 
                 self.save_file(con, self.dbn)
+        self.do_notify(TicketType.RESULT,
+                       f'done in {int(time.time() - start)} seconds')
 
     def get_db_data(self, query):
         "get data from sqlite database"
