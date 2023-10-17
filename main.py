@@ -20,10 +20,12 @@ if MULTI_THREADING:
 
 
 class App(tk.Tk):
-    "main application class"
+
     LOGO = os.path.join(os.path.dirname(__file__), "Logo.png")
 
     def __init__(self):
+        if os.environ.get('DISPLAY','') == '':
+            os.environ.__setitem__('DISPLAY', ':0.0')
         super().__init__()
         setup_styles()
         self.title("Amateur Radio Callgign Lookup")
@@ -68,6 +70,8 @@ class App(tk.Tk):
         entry.pack(side='left', pady=20)
         entry.focus_set()
 
+        entry.pack()
+
         ttk.Label(frame, style='heading.TLabel',
                   textvariable=self.display_call).pack()
         ttk.Label(frame, style='item.TLabel',
@@ -89,15 +93,14 @@ class App(tk.Tk):
 
     def handle_ticket(self, ticket):
         "update per ticket info"
-        match ticket.ticket_type:
-            case TicketType.STATUS:
-                self.update_status.set(ticket.value)
-            case TicketType.PROGRESS:
-                self.progress.set(ticket.value)
-            case TicketType.DONE:
-                pass
-            case TicketType.RESULT:
-                self.status.set(ticket.value)
+        if ticket.ticket_type == TicketType.STATUS:
+            self.update_status.set(ticket.value)
+        elif ticket.ticket_type == TicketType.PROGRESS:
+            self.progress.set(ticket.value)
+        elif ticket.ticket_type == TicketType.DONE:
+            pass
+        elif ticket.ticket_type == TicketType.RESULT:
+            self.status.set(ticket.value)
 
     def __show_date(self, _, country_data):
         db_date = country_data.get_db_date()
