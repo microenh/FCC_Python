@@ -20,11 +20,11 @@ if MULTI_THREADING:
 
 
 class App(tk.Tk):
-
+    """Main class"""
     LOGO = os.path.join(os.path.dirname(__file__), "Logo.png")
 
     def __init__(self):
-        if os.environ.get('DISPLAY','') == '':
+        if os.environ.get('DISPLAY', '') == '':
             os.environ.__setitem__('DISPLAY', ':0.0')
         super().__init__()
         setup_styles()
