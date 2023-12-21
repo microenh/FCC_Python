@@ -97,7 +97,14 @@ class DBBase(ABC):
     @classmethod
     def working_folder(cls, filename):
         "compute working folder relative to main script"
-        return os.path.join(os.path.dirname(__file__), filename)
+        # print(os.getenv('LOCALAPPDATA'))
+        # return os.path.join(os.path.dirname(__file__), filename)
+        s = os.getenv('LOCALAPPDATA')
+        if s is None:
+            s = ""
+        path = os.path.join(s, 'fcc', filename)
+        # print('wf: %s' % path)
+        return path
 
     def do_notify(self, which, value):
         "handle notification"

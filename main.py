@@ -24,7 +24,7 @@ class App(tk.Tk):
     LOGO = os.path.join(os.path.dirname(__file__), "Logo.png")
 
     def __init__(self):
-        if os.environ.get('DISPLAY','') == '':
+        if os.environ.get('DISPLAY', '') == '':
             os.environ.__setitem__('DISPLAY', ':0.0')
         super().__init__()
         setup_styles()
@@ -165,4 +165,12 @@ class App(tk.Tk):
 
 # create and run
 if __name__ == '__main__':
+    # print(os.getenv('LOCALAPPDATA'))
+    s = os.getenv('LOCALAPPDATA')
+    if s is None:
+        s = ""
+    path = os.path.join(s, 'fcc')
+    print(path)
+    if not os.path.exists(path):
+        os.makedirs(path)
     App().mainloop()
