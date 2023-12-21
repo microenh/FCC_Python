@@ -20,7 +20,7 @@ if MULTI_THREADING:
 
 
 class App(tk.Tk):
-
+    """Main class more"""
     LOGO = os.path.join(os.path.dirname(__file__), "Logo.png")
 
     def __init__(self):
