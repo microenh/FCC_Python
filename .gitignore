@@ -10,3 +10,6 @@ l_amat*.zip
 *.sqlite
 /FCC_Python/**
 /.venv/
+FCC_Python.lnk
+desktop.ini
+

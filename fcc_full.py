@@ -15,7 +15,7 @@ class FCCData(FCCBase):
     @property
     def dbn(self):
         "get database name"
-        return self.working_folder('fcc_full.sqlite')
+        return self.data_file('fcc_full.sqlite')
 
     @property
     def stage1(self):

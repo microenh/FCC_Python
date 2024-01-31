@@ -70,7 +70,7 @@ class CanadaData(DBBase):
     @property
     def dbn(self):
         "local database name"
-        return self.working_folder('canada.sqlite')
+        return self.data_file('canada.sqlite')
 
     @property
     def url(self):

@@ -7,8 +7,10 @@ import zipfile
 from abc import ABC, abstractmethod
 from io import BytesIO
 
+
 import requests
 
+from datafolder import data_folder
 from ticket import TicketType
 
 CREATE_DB_DATE = """
@@ -95,15 +97,8 @@ class DBBase(ABC):
             con.commit()
 
     @classmethod
-    def working_folder(cls, filename):
-        "compute working folder relative to main script"
-        # print(os.getenv('LOCALAPPDATA'))
-        # return os.path.join(os.path.dirname(__file__), filename)
-        s = os.getenv('LOCALAPPDATA')
-        if s is None:
-            s = ""
-        path = os.path.join(s, 'fcc', filename)
-        # print('wf: %s' % path)
+    def data_file(cls, filename):
+        path = os.path.join(data_folder(), filename)
         return path
 
     def do_notify(self, which, value):
@@ -181,7 +176,7 @@ class DBBase(ABC):
         return data
 
     def update(self):
-        """Populate canada.sqlite with data downloaded from Canada"""
+        """Populate XXX.sqlite with data downloaded from web"""
         start = time.time()
 
         bytes_read = (self.read_local(self.local_download)
