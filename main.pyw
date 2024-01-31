@@ -116,11 +116,6 @@ class App(tk.Tk):
         ticket = Ticket(which, value)
         self.handle_ticket(ticket)
 
-    def handle_update_event(self, ticket):
-        "update display with results from status dialog"
-        ticket = self.queue.get()
-        self.handle_ticket(ticket)
-
     def handle_ticket(self, ticket):
         "update per ticket info"
         if ticket.ticket_type == TicketType.STATUS:
