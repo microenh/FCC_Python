@@ -1,4 +1,4 @@
-#! /Users/mark/developer/python/ttk_fcc/.venv/scripts/pythonw.exe
+#! /Users/mark/developer/python/FCC_Python/.venv/scripts/pythonw.exe
 "Amateur radio callsign lookup based on national callsign data"
 import os
 import tkinter as tk
