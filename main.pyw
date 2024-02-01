@@ -19,8 +19,8 @@ class App(tk.Tk):
     """Main class more"""
     LOGO = os.path.join(os.path.dirname(__file__), "Logo.png")
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.last_dark = None
         if os.environ.get('DISPLAY', '') == '':
             os.environ.__setitem__('DISPLAY', ':0.0')
@@ -97,6 +97,7 @@ class App(tk.Tk):
         self.notes_entry.pack(expand=1, fill='both', pady=10, padx=(0,10))
         update_btn = ttk.Button(right_frame, text='UPDATE', command=self.updateNotes)
         update_btn.pack(anchor='center', pady=(0,10))
+        self.iconphoto(False, self.image)
 
     def updateNotes(self):
         self.notes.put(self.displayed_call,
