@@ -21,21 +21,21 @@ class FCCBase(DBBase):
         "lookup callsign data"
         lookup = self.get_db_data(
             f"select * from lookup where callsign='{call}'")
-        result = None
-        if lookup is not None:
-            name = ' '.join([i for i in lookup[11:15] if i > ''])
-            opc = 'Class: ' + \
-                op_class.get(
-                    lookup[5], 'Unknown') if lookup[9] == 'I' else ''
-            vanity = 'Vanity' if lookup[1] == 'HV' else ''
-            expires = 'Expires: ' + lookup[3] if lookup[3] > '' else ''
-            if name == '':
-                name = lookup[10]
-            csz = f'{lookup[16]}, {lookup[17]}  {lookup[18]}'
-            pob = f'PO BOX {lookup[19]}' if (lookup[19] > ' ') else ''
-            result = '\r'.join([i for i in (name, pob, lookup[15], csz, ' ',
+        if lookup is None:
+            return None
+        name = ' '.join([i for i in lookup[11:15] if i > ''])
+        opc = 'Class: ' + \
+            op_class.get(
+                lookup[5], 'Unknown') if lookup[9] == 'I' else ''
+        vanity = 'Vanity' if lookup[1] == 'HV' else ''
+        expires = 'Expires: ' + lookup[3] if lookup[3] > '' else ''
+        if name == '':
+            name = lookup[10]
+        csz = f'{lookup[16]}, {lookup[17]}  {lookup[18]}'
+        pob = f'PO BOX {lookup[19]}' if (lookup[19] > ' ') else ''
+        result = '\r'.join([i for i in (name, pob, lookup[15], csz, ' ',
                                             vanity, opc, expires) if i > ''])
-        return result
+        return result, lookup[15], lookup[18], 'US'
 
     @property
     def url(self):

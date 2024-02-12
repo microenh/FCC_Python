@@ -48,24 +48,26 @@ class CanadaData(DBBase):
         "lookup callsign record"
         lookup = self.get_db_data(
             f"select * from amateur_delim where callsign='{call}'")
-        result = None
-        if lookup is not None:
-            if lookup[12] == '':
-                name1 = ' '.join([i for i in lookup[1:3] if i > ''])
-                name2 = ''
-                address = lookup[3]
-                csz = f'{lookup[4]}, {lookup[5]}  {lookup[6]}'
-                opr = 'Class: ' + ''.join(lookup[8:12])
-            else:
-                name1 = lookup[12]
-                name2 = lookup[13]
-                address = lookup[14]
-                csz = f'{lookup[15]}, {lookup[16]}  {lookup[17]}'
-                opr = ''
+        if lookup is None:
+            return None
+        if lookup[12] == '':
+            name1 = ' '.join([i for i in lookup[1:3] if i > ''])
+            name2 = ''
+            address = lookup[3]
+            p_code = lookup[6]
+            csz = f'{lookup[4]}, {lookup[5]}  {lookup[6]}'
+            opr = 'Class: ' + ''.join(lookup[8:12])
+        else:
+            name1 = lookup[12]
+            name2 = lookup[13]
+            address = lookup[14]
+            p_code = lookup[17]
+            csz = f'{lookup[15]}, {lookup[16]}  {lookup[17]}'
+            opr = ''
 
-            result = '\r'.join(
-                [i for i in (name1, name2, address, csz, ' ', opr) if i > ''])
-        return result
+        result = '\r'.join(
+            [i for i in (name1, name2, address, csz, ' ', opr) if i > ''])
+        return result, address, p_code, 'CA'
 
     @property
     def dbn(self):

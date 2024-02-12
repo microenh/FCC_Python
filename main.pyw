@@ -14,6 +14,11 @@ from fcc import FCCData
 from status_dialog import StatusDialog
 from ticket import Ticket, TicketType
 from notesDB import NotesDB
+from geo import grid_square, bearing_dist
+
+# 3105 Big Plain-Circleville Rd.
+BASE_LONG = -83.3940
+BASE_LAT = 39.8541
 
 class App(tk.Tk):
     """Main class more"""
@@ -164,12 +169,20 @@ class App(tk.Tk):
 
         lookup_result = None
         for i in self.country_data:
-            lookup_result = i.lookup(call)
-            if lookup_result is not None:
+            result = i.lookup(call)
+            if result is not None:
                 break
-        if lookup_result is None:
-            lookup_result = 'Not Found'
-        self.lookup_result.set(lookup_result)
+        if result is None:
+            self.lookup_result.set('Not found')
+        else:
+            lookup_result, street, p_code, country = result
+            geo_lookup = self.notes.get_coords(street, p_code, country)
+            if geo_lookup is not None:
+                grid = grid_square(*geo_lookup)
+                bearing, dist = bearing_dist(BASE_LONG, BASE_LAT, *geo_lookup)
+                lookup_result += f'\rGRID: {grid[:6]} {dist:.0f} miles at {bearing:.0f} \u00b0'
+            self.lookup_result.set(lookup_result)
+            
 
     def update_country(self, country):
         "update"
