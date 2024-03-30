@@ -9,6 +9,7 @@ amateur_delim.zip
 l_amat*.zip
 *.sqlite
 /FCC_Python/**
+/fcc/
 /.venv/
 FCC_Python.lnk
 desktop.ini

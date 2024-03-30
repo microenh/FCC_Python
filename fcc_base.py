@@ -1,4 +1,6 @@
 " manage US data imported from FCC using small sqlite setup"
+from os.path import join
+from datafolder import data_folder
 
 import flag
 
@@ -12,10 +14,8 @@ class FCCBase(DBBase):
     # def __init__(self, notifications):
     #     super().__init__(notifications)
 
-    def parse(self, table_name, suffix, data):
-        "extract records from file in zip archive"
-        return [i.split('|') for i in str(data.read(
-            table_name + suffix), encoding='UTF-8').replace('"', '').split('\r\n')[:-1]]
+    def parse_rec(self, rec):
+        return str(rec, encoding='UTF-8').replace('"','').split('|')
 
     def lookup(self, call):
         "lookup callsign data"
@@ -55,7 +55,7 @@ class FCCBase(DBBase):
     @property
     def local_download(self):
         "local copy of download file for testing"
-        # return self.working_folder("l_amat_230924.zip")
+        # return join(data_folder(), "l_amat.zip")
         return ''
 
     @property
@@ -63,8 +63,10 @@ class FCCBase(DBBase):
         "extension in download file"
         return '.dat'
 
-    def parse_db_date(self, data):
+    def parse_db_date(self, zfl):
         "get date from counts table"
-        date_data = self.parse('counts', '', data)[0][0].split(' ')
-        date_data = [i for i in date_data if i > '']
-        return ((f'{months[date_data[4].upper()]}/{date_data[5]}/{date_data[8]}',),)
+        with zfl.open('counts') as c:
+            d = [i for i in
+                str(c.readline(), encoding='UTF-8').strip().split()
+                if i > '']
+        return f'{months[d[4].upper()]}/{d[5]}/{d[8]}'

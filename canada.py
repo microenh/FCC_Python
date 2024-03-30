@@ -1,10 +1,12 @@
 "manage data from Canada"
 
+from os.path import join
 import datetime
 
 import flag
 
 from db_base import CREATE_DB_DATE, DBBase
+from datafolder import data_folder
 
 CREATE_LOOKUP = """
 create table amateur_delim
@@ -39,10 +41,8 @@ class CanadaData(DBBase):
     # def __init__(self, notifications):
     #     super().__init__(notifications)
 
-    def parse(self, table_name, suffix, data):
-        "extract records from file in zip archive"
-        return [i.split(';') for i in str(data.read(
-            table_name + suffix), encoding='UTF-8').replace('"', '').split('\r\n')[1:]]
+    def parse_rec(self, rec):
+        return str(rec, encoding='UTF-8').replace('"','').split(';')
 
     def lookup(self, call):
         "lookup callsign record"
@@ -92,7 +92,7 @@ class CanadaData(DBBase):
     @property
     def local_download(self):
         "local copy of download file for testing"
-        # return self.working_folder("l_amat_230924.zip")
+        # return join(data_folder(), "amateur_delim.zip")
         return ''
 
     @property
@@ -115,7 +115,7 @@ class CanadaData(DBBase):
         "2nd stage database commands"
         return ()
 
-    def parse_db_date(self, data):
+    def parse_db_date(self, _):
         "no db date in file, use current"
         tdy = datetime.date.today()
-        return ((f'{tdy.month}/{tdy.day}/{tdy.year}',),)
+        return f'{tdy.month}/{tdy.day}/{tdy.year}'

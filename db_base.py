@@ -81,8 +81,14 @@ class DBBase(ABC):
         "abstract"
 
     @abstractmethod
-    def parse(self, table_name, suffix, data):
+    def parse_rec(self, rec):
         "abstract"
+
+    def parse(self, table_name, suffix, zfl):
+        "extract records from file in zip archive"
+        with zfl.open(table_name + suffix) as c:
+            r = [self.parse_rec(i) for i in c]
+        return r
 
     def __init__(self, notifications):
         self.notifications = notifications
@@ -103,28 +109,33 @@ class DBBase(ABC):
 
     def do_notify(self, which, value):
         "handle notification"
-        self.notifications.update(which, value)
+        self.notifications.update(which, value)        
 
-    def insert_data(self, con, table_name, data):
+    def insert_data(self, con, table_name, zfl):
         "insert data into sqlite database"
         # self.notifications.update.set(f'Importing {table_name}')
+        zi = zfl.getinfo(table_name + self.download_extension)
         self.do_notify(TicketType.STATUS, f'Importing {table_name}')
-        field_count = len(data[0])
-        stmt = f"insert into {table_name} values ({','.join(['?'] * field_count)});"
-        total_rows = len(data)
-        chunk_rows = max(1, total_rows // 100)
-        j = 0
-        k = 0
-        for i in data:
-            if self.notifications.abort.get():
-                return
-            if j % chunk_rows == 0:
-                # self.notifications.progress.set(j * 100 / total_rows)
-                self.do_notify(TicketType.PROGRESS, k)
-                k += 1
-            if len(i) == field_count:
-                con.execute(stmt, i)
-            j += 1
+        field_count = None
+        total_bytes = zi.file_size
+        chunk_bytes = max(1, total_bytes // 100)
+        j = k = 0
+        with zfl.open(zi) as data:
+            for i in data:
+                j += len(i)
+                i = self.parse_rec(i)
+                if field_count is None:
+                    field_count = len(i)
+                    stmt = f"insert into {table_name} values ({','.join(['?'] * field_count)});"
+                if self.notifications.abort.get():
+                    return
+                if j >= chunk_bytes:
+                    # self.notifications.progress.set(j * 100 / total_rows)
+                    self.do_notify(TicketType.PROGRESS, k)
+                    k += 1
+                    j -= chunk_bytes
+                if len(i) == field_count:
+                    con.execute(stmt, i)
         # self.notifications.progress.set(0)
         # self.notifications.update.set('')
         self.do_notify(TicketType.PROGRESS, 0)
@@ -146,24 +157,27 @@ class DBBase(ABC):
     def download(self, url):
         "download data from government's website"
         # self.notifications.update.set('Downloading')
+        local_file_name = os.path.join(data_folder(), os.path.split(url)[1])
         self.do_notify(TicketType.STATUS, 'Downloading')
         result = bytearray()
         try:
             response = requests.get(url, stream=True, timeout=10)
         except requests.ConnectTimeout:
             return result
-        received = bytearray()
+        # received = bytearray()
         total_size_in_bytes = int(
             response.headers.get('content-length', 0))
         pct = 0
-        for data in response.iter_content(chunk_size=total_size_in_bytes // 100):
-            self.do_notify(TicketType.PROGRESS, pct)
-            if self.notifications.abort.get():
-                return result
-            received += data
-            pct += 1
+        with open(local_file_name, 'wb') as f:
+            for data in response.iter_content(chunk_size=total_size_in_bytes // 100):
+                f.write(data)
+                self.do_notify(TicketType.PROGRESS, pct)
+                if self.notifications.abort.get():
+                    return result
+                # received += data
+                pct += 1
         self.do_notify(TicketType.PROGRESS, 0)
-        return received
+        return local_file_name
 
     @classmethod
     def read_local(cls, file_name):
@@ -179,17 +193,12 @@ class DBBase(ABC):
         """Populate XXX.sqlite with data downloaded from web"""
         start = time.time()
 
-        bytes_read = (self.read_local(self.local_download)
-                      if self.local_download > ''
-                      else self.download(self.url))
-        if len(bytes_read) == 0:
-            # self.notifications.status.set('Error reading data')
-            self.do_notify(TicketType.RESULT, 'Error reading data')
-            return
+        file_name = self.local_download
+        if file_name == '':
+            file_name = self.download(self.url)
 
-        with zipfile.ZipFile(BytesIO(bytes_read)) as zfl:
+        with zipfile.ZipFile(file_name) as zfl:
             with sqlite3.connect(":memory:") as con:
-
                 # create tables
                 # self.notifications.update.set('1st stage db commands')
                 self.do_notify(TicketType.STATUS, '1st stage db commands')
@@ -197,20 +206,23 @@ class DBBase(ABC):
                 self.db_commands(con, self.stage1)
                 if self.notifications.abort.get():
                     return
+                
+                self.do_notify(TicketType.STATUS, 'update db date')
+                con.execute('insert into db_date values (?)', (self.parse_db_date(zfl),))
 
                 # insert data from FCC data
                 for table_name in self.download_names:
                     if self.notifications.abort.get():
                         return
                     # self.notifications.update.set(f'Unpacking {table_name}')
-                    self.do_notify(TicketType.STATUS,
-                                   f'Unpacking {table_name}')
-                    data = self.parse(table_name, self.download_extension, zfl)
-                    self.insert_data(con, table_name, data)
+##                    self.do_notify(TicketType.STATUS,
+##                                   f'Unpacking {table_name}')
+##                    data = self.parse(table_name, self.download_extension, zfl)
+##                    self.insert_data(con, table_name, data)
+                    self.insert_data(con, table_name, zfl)
 
                 # self.notifications.update.set('update db date')
-                self.do_notify(TicketType.STATUS, 'update db date')
-                self.insert_data(con, 'db_date', self.parse_db_date(zfl))
+
                 if self.notifications.abort.get():
                     return
                 con.commit()
