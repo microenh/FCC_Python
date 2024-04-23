@@ -15,7 +15,8 @@ class FCCBase(DBBase):
     #     super().__init__(notifications)
 
     def parse_rec(self, rec):
-        return str(rec, encoding='UTF-8').replace('"','').split('|')
+        return [i.strip() for i in
+                str(rec, encoding='UTF-8').replace('"','').split('|')]
 
     def lookup(self, call):
         "lookup callsign data"
